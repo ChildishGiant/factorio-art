@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
 import argparse
-import sys
 from PIL import Image
 from PIL import ImageOps
 import base64
@@ -16,43 +15,23 @@ parser.add_argument("image",
 parser.add_argument("-d", "--dither", action='store_true',
                     help="Dither the image or not")
 
-parser.add_argument("-i", "--invert", action='store_true',
-                    help="Swap the tile and background")
+parser.add_argument("-i", "--invert", action='store_true')
 
 parser.add_argument("-c", "--copy", action='store_true',
                     help="Copy the blueprint code to clipboard")
 
-parser.add_argument("--tile", default="concrete",
-                    help="What tile to use for black pixels")
+parser.add_argument("--black", default="stone-path",
+                    help="What tile to use for black pixels, 'none' for no tile")
 
-parser.add_argument("--back",
-                    help="What tile to use for white pixels")
+parser.add_argument("--white", default="concrete",
+                    help="What tile to use for white pixels, 'none' for no tile")
 
 parser.add_argument("--file",
                     help="Write the blueprint string to a local file")
 
 args = vars(parser.parse_args())
 
-jsonString = """
-{
-    "blueprint":
-    {
-        "item":"blueprint",
-        "version": 68720787456,
-        "icons":
-        [
-            {
-                "signal":
-                {
-                    "name": "hazard-concrete",
-                    "type": "item"
-                },
-                "index": 1
-            }
-        ],
-        "tiles":
-        [
-"""
+jsonString = """{"blueprint":{"item":"blueprint","icons":[{"signal":{"name": "hazard-concrete","type": "item"},"index": 1}],"tiles":["""
 
 
 image = Image.open(args["image"])
@@ -67,20 +46,24 @@ for i in range(width):
     for j in range(height):
         pixel = image.getpixel((i, j))
 
-        # If there's no set back, skip white pixels
-        if pixel == 255 and args["back"] is None:
+        # If there's no set white, skip white pixels
+        if pixel == 255 and args["white"] == "none":
             continue
-        elif pixel == 255:
-            jsonString += '{"name":"' + args["back"] + '","position":{"x":' + str(i-width / 2) + ',' + '"y":' + str(j-height / 2) + '}},\n'
+        elif pixel == 255 and args["white"]:
+            jsonString += '{"name":"' + args["white"] + '","position":{"x":' + str(i-width / 2) + ',' + '"y":' + str(j-height / 2) + '}},'
             continue
 
-        jsonString += '{"name":"' + args["tile"] + '","position":{"x":' + str(i-width / 2) + ',' + '"y":' + str(j-height / 2) + '}},\n'
+        # If we're at this point, the pixel is black
+        if args["black"] == "none":
+            continue
+        else:
+            jsonString += '{"name":"' + args["black"] + '","position":{"x":' + str(i-width / 2) + ',' + '"y":' + str(j-height / 2) + '}},'
         # {"entity_number":1,"name":"transport-belt","position":{"x":0,"y":0}
         # b'{"blueprint":{"icons":[{"signal":{"type":"item","name":"transport-belt"},"index":1}],"entities":[{"entity_number":1,"name":"transport-belt","position":{"x":0,"y":0}}],"item":"blueprint","version":73017393153}}'
 
 # remove the last comma and add closing delimiters
-jsonString = jsonString[:-2] + "]}}"
-# print(jsonString)
+jsonString = jsonString[:-1] + "]}}"
+
 
 # blueprint format is major version number of game (currently 0)
 # followed by deflated and base 64 encoded json
@@ -96,4 +79,5 @@ if args["file"]:
     with open(args["file"], "w") as write:
         write.write(blueprint)
 
-print(blueprint)
+if not args["copy"] and not args["file"]:
+    print(blueprint)
